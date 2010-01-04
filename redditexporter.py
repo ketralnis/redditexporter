@@ -11,41 +11,39 @@ from xml.sax.saxutils import escape as escape_html
 from xml.sax.saxutils import unescape as unescape_html
 
 header_template = '''
-                  <html lang="en">
-                    <head>
-                      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/> 
-                      <link REL="SHORTCUT ICON" HREF="http://www.reddit.com/favicon.ico">
-                      <title>Exported links from %s</title>
-                      <style type="text/css">
-                        .selftext {
-                          border: 1px dashed;
-                        }
-                      </style>
-                    </head>
-                    <body>
-                      <ol>
-                  '''
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/> 
+    <link REL="SHORTCUT ICON" HREF="http://www.reddit.com/favicon.ico">
+    <title>Exported links from %(exported_url)s</title>
+    <style type="text/css">
+      .selftext {
+        border: 1px dashed;
+      }
+    </style>
+  </head>
+  <body>
+    <ol>
+'''.strip()
 link_template = '''
-                <li class="link">
-                  <h1><a href="%(url)s">%(title)s</a></h1>
-                  (<a href="%(domain_link)s">%(domain)s</a>)
-                  submitted by <a href="http://www.reddit.com/user/%(author)s">%(author)s</a>
-                  to <a href="http://www.reddit.com/r/%(subreddit)s">%(subreddit)s</a>
-                  %(score)d points
-                  at <tt>%(date)s</tt>
-                  (<a href="http://www.reddit.com/r/%(subreddit)s/comments/%(id)s">%(num_comments)d comments</a>,
-                   <a href="http://www.reddit.com/tb/%(id)s">toolbar</a>)
-                  %(selftext_template)s
-                </li>
-                '''
-selftext_template = '''
-                    <div class="selftext"">%s</div>
-                    '''
+<li class="link">
+  <h1><a href="%(url)s">%(title)s</a></h1>
+  (<a href="%(domain_link)s">%(domain)s</a>)
+  submitted by <a href="http://www.reddit.com/user/%(author)s">%(author)s</a>
+  to <a href="http://www.reddit.com/r/%(subreddit)s">%(subreddit)s</a>
+  %(score)d points
+  at <tt>%(date)s</tt>
+  (<a href="http://www.reddit.com/r/%(subreddit)s/comments/%(id)s">%(num_comments)d comments</a>,
+   <a href="http://www.reddit.com/tb/%(id)s">toolbar</a>)
+  %(selftext_template)s
+</li>
+'''.strip()
+selftext_template = '''<div class="selftext"">%s</div>'''
 footer_template = '''
-                      </ol>
-                    </body>
-                  </html>
-                  '''
+    </ol>
+  </body>
+</html>
+'''.strip()
 
 # please don't hurt reddit
 fetch_size = 100     # the higher the better, but reddit ignores +100
@@ -53,6 +51,8 @@ sleep_time = 1       # in seconds. how long to sleep between
                      # requests. higher is better
 request_limit = None # how many requests to make to reddit before
                      # stopping (set to None to disable)
+
+debug = False
 
 def get_links(sourceurl, requests = 0):
     '''
@@ -74,7 +74,9 @@ def get_links(sourceurl, requests = 0):
                     urlencode(parsed_params, doseq = True), fragment)
     composed_sourceurl = urlunparse(new_urltuple)
 
-    sys.stderr.write('fetching %s\n' % composed_sourceurl)
+    if debug:
+        sys.stderr.write('fetching %s\n' % composed_sourceurl)
+
     text = urllib.urlopen(composed_sourceurl).read()
     parsed = json.loads(text)
 
@@ -109,10 +111,14 @@ def main(sourceurl):
     Given a reddit JSON url, yield unicode strings that represent the
     exported HTML
     '''
-    yield header_template % escape_html(sourceurl)
+    yield header_template % dict(exported_url = escape_html(sourceurl))
 
     for link in get_links(sourceurl):
-        assert link['kind'] == 't3'
+        if link['kind'] != 't3':
+            # skip non-links. support for comments can be added later
+            # if someone cares enough
+            continue
+
         data = link['data']
 
         template_data = dict(
@@ -143,9 +149,7 @@ def main(sourceurl):
             selftext = selftext_template % unescape_html(data['selftext_html'])
             template_data['selftext_template'] = selftext
 
-        text = link_template % template_data
-
-        yield text
+        yield link_template % template_data
 
     yield footer_template
 
