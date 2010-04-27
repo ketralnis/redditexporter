@@ -17,7 +17,7 @@ header_template = '''
     <link REL="SHORTCUT ICON" HREF="http://www.reddit.com/favicon.ico">
     <title>Exported links from %(exported_url)s</title>
     <style type="text/css">
-      .selftext {
+      .selftext, .comment .body {
         border: 1px dashed;
       }
     </style>
@@ -31,14 +31,24 @@ link_template = '''
   (<a href="%(domain_link)s">%(domain)s</a>)
   submitted by <a href="http://www.reddit.com/user/%(author)s">%(author)s</a>
   to <a href="http://www.reddit.com/r/%(subreddit)s">%(subreddit)s</a>
-  %(score)d points
   at <tt>%(date)s</tt>
+  %(score)d points
   (<a href="http://www.reddit.com/r/%(subreddit)s/comments/%(id)s">%(num_comments)d comments</a>,
    <a href="http://www.reddit.com/tb/%(id)s">toolbar</a>)
   %(selftext_template)s
 </li>
 '''.strip()
 selftext_template = '''<div class="selftext"">%s</div>'''
+comment_template = '''
+<li class="comment">
+  <div class="body">%(body)s</div>
+  by %(author)s to %(subreddit)s
+  at <tt>%(date)s</tt>
+  %(score)d points
+  <a href="http://www.reddit.com/r/$(subreddit)s/comments/%(link_id36)s/x/%(id)s/">permalink</a>
+  <a href="http://www.reddit.com/r/$(subreddit)s/comments/%(link_id36)s/x/%(id)s?context=1#%(id)s">context</a>
+</li>
+'''.strip()
 footer_template = '''
     </ol>
   </body>
@@ -114,42 +124,57 @@ def main(sourceurl):
     yield header_template % dict(exported_url = escape_html(sourceurl))
 
     for link in get_links(sourceurl):
-        if link['kind'] != 't3':
-            # skip non-links. support for comments can be added later
-            # if someone cares enough
-            continue
-
         data = link['data']
 
-        template_data = dict(
-            id = escape_html(data['id']),
-            url = escape_html(data['url']),
-            title = escape_html(data['title']),
-            domain = escape_html(data['domain']),
-            author = escape_html(data['author']),
-            subreddit = escape_html(data['subreddit']),
-            score = int(data['score']),
-            num_comments = int(data['num_comments']),
-            date = time.ctime(data['created_utc']),
-            selftext_template = '',
-            )
+        if link['kind'] == 't3':
+            # links
 
-        if data['domain'].startswith('self.') and data['url'].startswith('http://www.reddit.com/'):
-            # This is the only way to tell if it's a self-post from
-            # the API :-/
-            template_data['domain_link'] = (
-                'http://www.reddit.com/r/%(subreddit)s'
-                % dict(subreddit = escape_html(data['subreddit'])))
+            template_data = dict(
+                id = escape_html(data['id']),
+                url = escape_html(data['url']),
+                title = escape_html(data['title']),
+                domain = escape_html(data['domain']),
+                author = escape_html(data['author']),
+                subreddit = escape_html(data['subreddit']),
+                score = int(data['score']),
+                num_comments = int(data['num_comments']),
+                date = time.ctime(data['created_utc']),
+                selftext_template = '',
+                )
+
+            if data.get('is_self', False):
+                # This is the only way to tell if it's a self-post from
+                # the API :-/
+                template_data['domain_link'] = (
+                    'http://www.reddit.com/r/%(subreddit)s'
+                    % dict(subreddit = escape_html(data['subreddit'])))
+            else:
+                template_data['domain_link'] = (
+                    'http://www.reddit.com/domain/%(domain)s'
+                    % dict(domain = escape_html(data['domain'])))
+
+            if data.get('selftext_html'):
+                selftext = selftext_template % unescape_html(data['selftext_html'])
+                template_data['selftext_template'] = selftext
+
+            yield link_template % template_data
+
+        elif link['kind'] == 't1':
+            # comments
+
+            template_data = dict(body = unescape_html(data['body_html']),
+                                 author = escape_html(data['author']),
+                                 subreddit = escape_html(data['subreddit']),
+                                 id = escape_html(data['id']),
+                                 score = int(data['ups']) - int(data['downs']),
+                                 date = time.ctime(data['created_utc']),
+                                 link_id36 = escape_html(data['link_id'].split('_')[1]),
+                                 )
+
+            yield comment_template % template_data
+
         else:
-            template_data['domain_link'] = (
-                'http://www.reddit.com/domain/%(domain)s'
-                % dict(domain = escape_html(data['domain'])))
-
-        if data.get('selftext_html'):
-            selftext = selftext_template % unescape_html(data['selftext_html'])
-            template_data['selftext_template'] = selftext
-
-        yield link_template % template_data
+            raise TypeError("I don't know how to decode %r" % link)
 
     yield footer_template
 

@@ -3,5 +3,5 @@ Use it like:
     redditexporter.py http://www.reddit.com/user/ketralnis.json > ketralnis.html
 
 TODO:
-* Add support for comments, maybe for subreddits
-* Authentication, to pull `liked` listings
+* Add support for subreddits (reddit.com/reddits)
+* Authentication, required to pull `liked` listings
