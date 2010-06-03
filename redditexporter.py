@@ -8,6 +8,8 @@ import httplib2
 from urllib import urlencode
 from urlparse import urlparse, urlunparse, parse_qs
 
+from optparse import OptionParser
+
 from xml.sax.saxutils import escape as escape_html
 from xml.sax.saxutils import unescape as unescape_html
 
@@ -67,6 +69,7 @@ debug = False
 
 http = httplib2.Http()
 
+
 def login(username, password):
     url = 'http://www.reddit.com/api/login/%s' % username
     body = {'user': username,
@@ -74,7 +77,7 @@ def login(username, password):
     headers = {'Content-type': 'application/x-www-form-urlencoded'}
 
     try:
-        response, content = http.request(url, 'POST', headers=headers, body=urllib.urlencode(body))
+        response, content = http.request(url, 'POST', headers=headers, body=urlencode(body))
     except Exception, e:
         print "Could not login"
         print e
@@ -82,7 +85,7 @@ def login(username, password):
 
     return response['set-cookie']
 
-def get_links(sourceurl, requests = 0):
+def get_links(sourceurl, login_cookie = '', requests = 0):
     '''
     Given a reddit JSON URL, yield the JSON Link API objects,
     following 'after' links
@@ -105,7 +108,11 @@ def get_links(sourceurl, requests = 0):
     if debug:
         sys.stderr.write('fetching %s\n' % composed_sourceurl)
 
-    text = urllib.urlopen(composed_sourceurl).read()
+    if login_cookie:
+        headers = {'Cookie': login_cookie}
+        response, text = http.request(composed_sourceurl, 'GET', headers=headers)
+    else:
+        text = urllib.urlopen(composed_sourceurl).read()
     parsed = json.loads(text)
 
     # there may be multiple listings, like on a comments-page, but we
@@ -134,14 +141,19 @@ def get_links(sourceurl, requests = 0):
         for link in get_links(after_sourceurl, requests+1):
             yield link
 
-def main(sourceurl):
+def main(sourceurl, username = None, password = None):
     '''
     Given a reddit JSON url, yield unicode strings that represent the
     exported HTML
     '''
     yield header_template % dict(exported_url = escape_html(sourceurl))
 
-    for link in get_links(sourceurl):
+    cookie = None
+
+    if username and password:
+        cookie = login(username, password)
+
+    for link in get_links(sourceurl, cookie):
         data = link['data']
 
         if link['kind'] == 't3':
@@ -198,5 +210,17 @@ def main(sourceurl):
 
 
 if __name__=='__main__':
-    for s in main(sys.argv[1]):
+    parser = OptionParser()
+    parser.add_option('--username', '-u', dest='username')
+    parser.add_option('--password', '-p', dest='password')
+    parser.add_option('--verbose', '-v', action="store_true", dest="verbose")
+
+    options, args = parser.parse_args()
+
+    debug = options.verbose
+
+    if len(args) < 1:
+        parser.error("You need to pass an url")
+
+    for s in main(args[0], options.username, options.password):
         sys.stdout.write(s.encode('utf-8'))
