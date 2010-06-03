@@ -4,6 +4,7 @@ import sys
 import json
 import time
 import urllib
+import httplib2
 from urllib import urlencode
 from urlparse import urlparse, urlunparse, parse_qs
 
@@ -63,6 +64,23 @@ request_limit = None # how many requests to make to reddit before
                      # stopping (set to None to disable)
 
 debug = False
+
+http = httplib2.Http()
+
+def login(username, password):
+    url = 'http://www.reddit.com/api/login/%s' % username
+    body = {'user': username,
+            'passwd': password}
+    headers = {'Content-type': 'application/x-www-form-urlencoded'}
+
+    try:
+        response, content = http.request(url, 'POST', headers=headers, body=urllib.urlencode(body))
+    except Exception, e:
+        print "Could not login"
+        print e
+        sys.exit(1)
+
+    return response['set-cookie']
 
 def get_links(sourceurl, requests = 0):
     '''
