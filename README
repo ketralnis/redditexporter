@@ -2,6 +2,11 @@ Use it like:
 
     redditexporter.py http://www.reddit.com/user/ketralnis.json > ketralnis.html
 
+    Or, if you want to access an authenticated page, you can use it like this:
+        redditexporter.py --username=username --password=password http://www.reddit.com/saved.json > my_saved_links.html
+
+    Also, there's a simple help:
+        redditexporter.py --help
+
 TODO:
 * Add support for subreddits (reddit.com/reddits)
-* Authentication, required to pull `liked` listings
