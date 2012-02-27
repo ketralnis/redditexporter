@@ -138,7 +138,7 @@ def get_links(sourceurl, login_cookie = '', requests = 0):
 
         # yes, this is recursive, but if you're making enough requests
         # to blow out your stack, you're probably hurting reddit
-        for link in get_links(after_sourceurl, requests+1):
+        for link in get_links(after_sourceurl, login_cookie, requests+1):
             yield link
 
 def main(sourceurl, username = None, password = None):
