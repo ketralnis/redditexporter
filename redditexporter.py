@@ -48,8 +48,8 @@ comment_template = '''
   by %(author)s to %(subreddit)s
   at <tt>%(date)s</tt>
   %(score)d points
-  <a href="http://www.reddit.com/r/$(subreddit)s/comments/%(link_id36)s/x/%(id)s/">permalink</a>
-  <a href="http://www.reddit.com/r/$(subreddit)s/comments/%(link_id36)s/x/%(id)s?context=1#%(id)s">context</a>
+  <a href="http://www.reddit.com/r/%(subreddit)s/comments/%(link_id36)s/x/%(id)s/">permalink</a>
+  <a href="http://www.reddit.com/r/%(subreddit)s/comments/%(link_id36)s/x/%(id)s?context=1#%(id)s">context</a>
 </li>
 '''.strip()
 footer_template = '''
